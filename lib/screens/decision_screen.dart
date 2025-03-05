@@ -3,6 +3,13 @@ import 'dart:ui';
 import '../widgets/gradient_button.dart';
 import '../services/movie_service.dart';
 
+// 将枚举移到类的外部
+enum ButtonState {
+  initial,    // 初始状态：生成推荐
+  loading,    // 加载状态：正在生成推荐...
+  completed   // 完成状态：开始使用
+}
+
 class DecisionScreen extends StatefulWidget {
   @override
   _DecisionScreenState createState() => _DecisionScreenState();
@@ -13,6 +20,16 @@ class _DecisionScreenState extends State<DecisionScreen> with TickerProviderStat
   late Animation<double> _floatAnimation1, _floatAnimation2;
   bool _isPressed = false;
   final MovieService _movieService = MovieService();
+  
+  // 添加加载状态
+  bool _isLoading = false;
+  
+  // 添加按钮状态
+  ButtonState _buttonState = ButtonState.initial;
+  
+  // 添加加载动画控制器
+  late AnimationController _loadingController;
+  late Animation<double> _loadingAnimation;
 
   @override
   void initState() {
@@ -36,13 +53,132 @@ class _DecisionScreenState extends State<DecisionScreen> with TickerProviderStat
 
     Future.delayed(Duration(milliseconds: 800), () => _floatController1.forward());
     Future.delayed(Duration(milliseconds: 1300), () => _floatController2.forward());
+
+    // 初始化加载动画
+    _loadingController = AnimationController(
+      duration: Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _loadingAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _loadingController,
+      curve: Curves.easeInOut,
+    ));
+
+    // 让加载动画循环播放
+    _loadingController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _loadingController.reset();
+        _loadingController.forward();
+      }
+    });
   }
 
   @override
   void dispose() {
     _floatController1.dispose();
     _floatController2.dispose();
+    _loadingController.dispose();
     super.dispose();
+  }
+
+  // 修改按钮构建方法
+  Widget _buildButton() {
+    String buttonText;
+    IconData? buttonIcon;
+    
+    switch (_buttonState) {
+      case ButtonState.initial:
+        buttonText = "生成推荐";
+        buttonIcon = Icons.movie_outlined;
+        break;
+      case ButtonState.loading:
+        buttonText = "正在生成推荐...";
+        buttonIcon = null;
+        break;
+      case ButtonState.completed:
+        buttonText = "开始使用";
+        buttonIcon = Icons.check;
+        break;
+    }
+
+    return GradientButton(
+      text: buttonText,
+      icon: buttonIcon,
+      onTap: _buttonState == ButtonState.loading ? null : () async {
+        if (_buttonState == ButtonState.initial) {
+          setState(() {
+            _buttonState = ButtonState.loading;
+          });
+          _loadingController.forward();
+
+          try {
+            print('开始获取电影数据...');
+            final movies = await _movieService.getRandomPopularMovies(3);
+            print('成功获取到 ${movies.length} 部电影');
+            for (var movie in movies) {
+              print('-------------------');
+              print('电影标题: ${movie['title']}');
+              print('评分: ${movie['vote_average']}');
+              print('简介: ${movie['overview']}');
+              print('图片: ${movie['poster_path']}');
+              print('上映日期: ${movie['release_date']}');
+              print('语言: ${movie['original_language']}');
+              print('ID: ${movie['id']}');
+            }
+            
+            setState(() {
+              _buttonState = ButtonState.completed;
+            });
+          } catch (e, stackTrace) {
+            print('获取电影数据失败');
+            print('错误: $e');
+            print('堆栈: $stackTrace');
+            // 如果失败，回到初始状态
+            setState(() {
+              _buttonState = ButtonState.initial;
+            });
+          } finally {
+            _loadingController.stop();
+          }
+        } else if (_buttonState == ButtonState.completed) {
+          // TODO: 处理"开始使用"的点击事件
+          print('开始使用点击');
+        }
+      },
+      gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
+      child: _buttonState == ButtonState.loading ? AnimatedBuilder(
+        animation: _loadingAnimation,
+        builder: (context, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  value: _loadingAnimation.value,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 2,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                "正在生成推荐...",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+        },
+      ) : null,
+    );
   }
 
   @override
@@ -230,32 +366,7 @@ class _DecisionScreenState extends State<DecisionScreen> with TickerProviderStat
                   right: 16, 
                   bottom: 8 + bottomPadding
                 ),
-                child: GradientButton(
-                  text: "开始使用",
-                  icon: Icons.check,
-                  onTap: () async {
-                    try {
-                      print('开始获取电影数据...');
-                      final movies = await _movieService.getRandomPopularMovies(3);
-                      print('成功获取到 ${movies.length} 部电影');
-                      for (var movie in movies) {
-                        print('-------------------');
-                        print('电影标题: ${movie['title']}');
-                        print('评分: ${movie['vote_average']}');
-                        print('简介: ${movie['overview']}');
-                        print('图片: ${movie['poster_path']}');
-                        print('上映日期: ${movie['release_date']}');
-                        print('语言: ${movie['original_language']}');
-                        print('ID: ${movie['id']}');
-                      }
-                    } catch (e, stackTrace) {
-                      print('获取电影数据失败');
-                      print('错误: $e');
-                      print('堆栈: $stackTrace');
-                    }
-                  },
-                  gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
+                child: _buildButton(),
               ),
             ],
           ),

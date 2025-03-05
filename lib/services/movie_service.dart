@@ -25,13 +25,13 @@ class MovieService {
       );
       
       final random = Random();
-      final randomPage = random.nextInt(totalPages - 1) + 1;
+      List<Map<String, dynamic>> validMovies = [];
       
-      print('总页数(限制500页): $totalPages, 随机选择第 $randomPage 页');
-      
-      // 使用随机页数重新请求
-      print('开始第二次请求，页数: $randomPage');
-      try {
+      // 持续获取数据直到找到足够的有效电影
+      while (validMovies.length < count) {
+        final randomPage = random.nextInt(totalPages - 1) + 1;
+        print('尝试获取第 $randomPage 页的数据');
+        
         final response = await _client.get<Map<String, dynamic>>(
           '/movie/popular',
           queryParameters: {
@@ -40,22 +40,31 @@ class MovieService {
           },
         );
         
-        print('第二次请求成功，开始处理数据');
         final List<dynamic> results = response['results'] as List<dynamic>;
         final List<Map<String, dynamic>> movies = results.cast<Map<String, dynamic>>();
         
-        movies.shuffle(random);
-        return movies.take(count).toList();
-      } catch (e, stackTrace) {
-        print('第二次请求失败');
-        print('错误: $e');
-        print('堆栈: $stackTrace');
-        rethrow;
+        // 过滤出有效的电影（有简介的）
+        final validMoviesFromPage = movies.where((movie) {
+          final overview = movie['overview'] as String?;
+          return overview != null && overview.trim().isNotEmpty;
+        }).toList();
+        
+        // 打乱有效电影的顺序
+        validMoviesFromPage.shuffle(random);
+        
+        // 添加到有效电影列表中
+        validMovies.addAll(validMoviesFromPage);
+        
+        // 如果收集到足够的有效电影，就截取需要的数量
+        if (validMovies.length >= count) {
+          validMovies = validMovies.take(count).toList();
+          break;
+        }
       }
-    } catch (e, stackTrace) {
-      print('获取电影失败');
-      print('错误: $e');
-      print('堆栈: $stackTrace');
+      
+      return validMovies;
+    } catch (e) {
+      print('获取电影失败: $e');
       rethrow;
     }
   }

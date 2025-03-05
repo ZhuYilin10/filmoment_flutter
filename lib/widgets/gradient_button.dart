@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-class GradientButton extends StatefulWidget {
+class GradientButton extends StatelessWidget {
   final String text;
   final IconData? icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double height;
   final BorderRadius? borderRadius;
   final List<Color> gradientColors;
@@ -13,110 +13,72 @@ class GradientButton extends StatefulWidget {
   final double? shadowOpacity;
   final Offset? shadowOffset;
   final double? shadowBlurRadius;
+  final Widget? child;
 
   const GradientButton({
     Key? key,
     required this.text,
     this.icon,
-    required this.onTap,
+    this.onTap,
     this.height = 56.0,
     this.borderRadius,
-    this.gradientColors = const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+    this.gradientColors = const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
     this.padding = const EdgeInsets.symmetric(vertical: 16),
     this.textStyle,
     this.shadowOpacity = 0.3,
     this.shadowOffset = const Offset(0, 10),
     this.shadowBlurRadius = 25,
+    this.child,
   }) : super(key: key);
-
-  @override
-  _GradientButtonState createState() => _GradientButtonState();
-}
-
-class _GradientButtonState extends State<GradientButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-  bool _isHovering = false;
-
-  @override
-  void initState() {
-    super.initState();
-    
-    // 创建动画控制器 - 延长动画时间到4秒
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 4000),
-      vsync: this,
-    );
-    
-    // 创建动画曲线
-    _animation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-    
-    // 开始动画并设置重复
-    _controller.repeat(reverse: false);
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
+      onEnter: (_) => {},
+      onExit: (_) => {},
       child: Stack(
         children: [
           // 主按钮
           Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: widget.borderRadius ?? BorderRadius.circular(16),
-              onTap: widget.onTap,
+              borderRadius: borderRadius ?? BorderRadius.circular(16),
+              onTap: onTap,
               child: Ink(
                 decoration: BoxDecoration(
-                  borderRadius: widget.borderRadius ?? BorderRadius.circular(16),
+                  borderRadius: borderRadius ?? BorderRadius.circular(16),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: widget.gradientColors,
+                    colors: gradientColors,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.gradientColors[0].withOpacity(widget.shadowOpacity ?? 0.3),
-                      offset: widget.shadowOffset ?? Offset(0, 10),
-                      blurRadius: widget.shadowBlurRadius ?? 25,
+                      color: gradientColors[0].withOpacity(shadowOpacity ?? 0.3),
+                      offset: shadowOffset ?? Offset(0, 10),
+                      blurRadius: shadowBlurRadius ?? 25,
                     ),
                   ],
                 ),
                 child: Container(
                   width: double.infinity,
-                  height: widget.height,
-                  padding: widget.padding,
-                  child: Row(
+                  height: height,
+                  padding: padding,
+                  child: child ?? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: Colors.white),
+                        SizedBox(width: 8),
+                      ],
                       Text(
-                        widget.text,
-                        style: widget.textStyle ?? TextStyle(
+                        text,
+                        style: textStyle ?? TextStyle(
                           color: Colors.white,
                           fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1.0,
-                          fontFamily: 'Noto Serif SC',
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (widget.icon != null) ...[
-                        SizedBox(width: 8),
-                        Icon(widget.icon, color: Colors.white),
-                      ],
                     ],
                   ),
                 ),
@@ -124,27 +86,7 @@ class _GradientButtonState extends State<GradientButton> with SingleTickerProvid
             ),
           ),
           
-          // HTML风格扫光效果
-          IgnorePointer(
-            child: ClipRRect(
-              borderRadius: widget.borderRadius ?? BorderRadius.circular(16),
-              child: SizedBox(
-                height: widget.height,
-                width: double.infinity,
-                child: AnimatedBuilder(
-                  animation: _animation,
-                  builder: (context, child) {
-                    return CustomPaint(
-                      painter: SweepLightPainter(
-                        progress: _animation.value,
-                        isHovering: _isHovering,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
+          // 移除扫光效果
         ],
       ),
     );
